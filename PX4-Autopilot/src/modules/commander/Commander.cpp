@@ -765,6 +765,7 @@ Commander::handle_command(const vehicle_command_s &cmd)
 			transition_result_t main_ret = TRANSITION_NOT_CHANGED;
 
 			if (base_mode & VEHICLE_MODE_FLAG_CUSTOM_MODE_ENABLED) {
+				_vehicle_control_mode._padding0[0] = 0U;
 				/* use autopilot-specific mode */
 				if (custom_main_mode == PX4_CUSTOM_MAIN_MODE_MANUAL) {
 					desired_nav_state = vehicle_status_s::NAVIGATION_STATE_MANUAL;
@@ -827,7 +828,12 @@ Commander::handle_command(const vehicle_command_s &cmd)
 
 				} else if (custom_main_mode == PX4_CUSTOM_MAIN_MODE_OFFBOARD) {
 					desired_nav_state = vehicle_status_s::NAVIGATION_STATE_OFFBOARD;
+
+				} else if (custom_main_mode == PX4_CUSTOM_MAIN_MODE_SIMPLE) {
+					_vehicle_control_mode._padding0[0] = 1U;
+
 				}
+				_vehicle_control_mode_pub.publish(_vehicle_control_mode);
 
 			} else {
 				/* use base mode */
@@ -2352,10 +2358,12 @@ void Commander::control_status_leds(bool changed, const uint8_t battery_warning)
 
 void Commander::updateControlMode()
 {
+	uint8_t save_padding0 = _vehicle_control_mode._padding0[0];  //20230926 shiwei add :to test lnav
 	_vehicle_control_mode = {};
 	mode_util::getVehicleControlMode(isArmed(), _vehicle_status.nav_state,
 					 _vehicle_status.vehicle_type, _offboard_control_mode_sub.get(), _vehicle_control_mode);
 	_vehicle_control_mode.timestamp = hrt_absolute_time();
+	_vehicle_control_mode._padding0[0] = save_padding0;     //20230926 shiwei  add :to test lnav
 	_vehicle_control_mode_pub.publish(_vehicle_control_mode);
 }
 

@@ -126,6 +126,11 @@ private:
 				system_status = MAV_STATE_FLIGHT_TERMINATION;
 			}
 
+			//20230927 shiwei add :to test lnav
+			if(vehicle_control_mode._padding0[0] == 1U){
+				custom_mode.data |= PX4_CUSTOM_MAIN_MODE_SIMPLE;
+			}
+			//20230927 shiwei add :to test lnav
 
 			mavlink_msg_heartbeat_send(_mavlink->get_channel(), _mavlink->get_system_type(), MAV_AUTOPILOT_PX4,
 						   base_mode, custom_mode.data, system_status);
