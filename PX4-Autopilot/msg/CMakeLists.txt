@@ -211,6 +211,7 @@ set(msg_files
 	VehicleImu.msg
 	VehicleImuStatus.msg
 	VehicleLandDetected.msg
+	VehicleLnav.msg           #20230928 shiwei add :to test lnav
 	VehicleLocalPosition.msg
 	VehicleLocalPositionSetpoint.msg
 	VehicleMagnetometer.msg
