@@ -439,6 +439,11 @@ private:
 
 	//20230928 shiwei add LNAV input : to test lnav
 	LnavMainInput_t PX4LnavMainInput;
+	//zhangmin add 2023 10 8
+	LnavTransTurn PX4LnavTransTurn;
+	position_setpoint_s current_sp_latch;
+	bool Lnav_inArc_flag;
+	position_setpoint_s current_sp_used;
 
 	// Update subscriptions
 	void airspeed_poll();
@@ -869,7 +874,8 @@ private:
 	 *
 	 */
 	void publishVehicleLnav(float roll_body);
-
+	//zhangmin add 2023 10 8
+	void setTransTurn(void);
 	DEFINE_PARAMETERS(
 
 		(ParamFloat<px4::params::FW_AIRSPD_MAX>) _param_fw_airspd_max,

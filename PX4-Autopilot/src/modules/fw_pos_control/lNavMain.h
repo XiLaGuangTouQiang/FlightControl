@@ -4,8 +4,9 @@
 #include <string.h>
 #include "MODEL/LNAV.h"
 #include <stdint.h>
+#include "transitionTurn.h"
 
-#define bool int
+//#define bool int
 
 typedef struct _navPosition_t
 {
@@ -35,6 +36,15 @@ typedef struct _lnavMainInput_t
     double position_setpoint[8];
     LNavStatus lnav_status;
 } LnavMainInput_t;
+
+typedef struct _lnavTransTurn
+{
+    GeographicalP prevLegStart;
+    GeographicalP cross;
+    GeographicalP nextLegEnd;
+    TransTurn transTurn;
+
+} LnavTransTurn;
 
 // typedef struct _perfLegs
 // {
