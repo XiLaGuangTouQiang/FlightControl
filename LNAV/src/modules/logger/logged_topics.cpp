@@ -117,6 +117,7 @@ void LoggedTopics::add_default_topics()
 	add_topic("vehicle_status_flags");
 	add_optional_topic("vtol_vehicle_status", 200);
 	add_topic("wind", 1000);
+	add_topic("vehicle_lnav",500);    //20230928 shiwei add :to test lnav
 
 	// multi topics
 	add_optional_topic_multi("actuator_outputs", 100, 3);
