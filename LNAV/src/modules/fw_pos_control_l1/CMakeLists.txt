@@ -33,6 +33,8 @@
 
 add_subdirectory(launchdetection)
 add_subdirectory(runway_takeoff)
+add_subdirectory(MODEL)
+add_subdirectory(TURN)
 
 px4_add_module(
 	MODULE modules__fw_pos_control_l1
@@ -40,11 +42,17 @@ px4_add_module(
 	SRCS
 		FixedwingPositionControl.cpp
 		FixedwingPositionControl.hpp
+		lNavMain.c
+		lNavMain.h
+		transitionTurn.c
+		transitionTurn.h
 	DEPENDS
+		lnav
+		turn
 		l1
 		launchdetection
 		landing_slope
-    npfg
+                npfg
 		runway_takeoff
 		SlewRate
 		tecs

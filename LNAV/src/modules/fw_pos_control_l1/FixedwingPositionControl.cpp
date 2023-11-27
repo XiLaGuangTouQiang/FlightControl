@@ -78,6 +78,14 @@ FixedwingPositionControl::FixedwingPositionControl(bool vtol) :
 
 	/* fetch initial parameter values */
 	parameters_update();
+
+	//20230922 shiwei add :to test lnav
+	lnav_init();
+	//2023 10 8 zhangmin add
+	current_sp_used = {0};
+	current_sp_latch = {0};
+	Lnav_inArc_flag = false;
+	//20230922 shiwei add :to test lnav
 }
 
 FixedwingPositionControl::~FixedwingPositionControl()
@@ -1093,6 +1101,110 @@ FixedwingPositionControl::handle_setpoint_type(const uint8_t setpoint_type, cons
 	return position_sp_type;
 }
 
+// 20231124 zhangmin add
+void
+FixedwingPositionControl::setTransTurn()
+{
+	PX4LnavTransTurn.prevLegStart = {_pos_sp_triplet.previous.lat * POINT_TRANS,_pos_sp_triplet.previous.lon * POINT_TRANS};
+	PX4LnavTransTurn.cross = {_pos_sp_triplet.current.lat * POINT_TRANS,_pos_sp_triplet.current.lon * POINT_TRANS};
+	PX4LnavTransTurn.nextLegEnd = {_pos_sp_triplet.next.lat * POINT_TRANS,_pos_sp_triplet.next.lon * POINT_TRANS};
+	PX4LnavTransTurn.transTurn = createTransTurn(PX4LnavTransTurn.prevLegStart,PX4LnavTransTurn.cross,PX4LnavTransTurn.nextLegEnd,LNAV_RADIUM);//1nm=1.852km?
+
+}
+
+void
+FixedwingPositionControl::setLnavInput()
+{
+
+	double dist = get_distance_to_next_waypoint(_current_latitude,_current_longitude,current_sp_used.lat,current_sp_used.lon);
+	//if( dist <= _navigator->get_acceptance_radius())
+	if( dist <= (double)50.0 )
+	{
+		if(Lnav_inArc_flag)
+		{
+			current_sp_used = _pos_sp_triplet.current;
+			Lnav_inArc_flag = false;
+		}
+		else
+		{
+			current_sp_used.lat = (double)PX4LnavTransTurn.transTurn.endPoint.latiMin / POINT_TRANS;
+			current_sp_used.lon = (double)PX4LnavTransTurn.transTurn.endPoint.longiMin / POINT_TRANS;
+			Lnav_inArc_flag = true;
+		}
+
+	}
+
+	if (fabs(current_sp_latch.lat-_pos_sp_triplet.previous.lat)<0.00001 && fabs(current_sp_latch.lon-_pos_sp_triplet.previous.lon)<0.00001 && (!Lnav_inArc_flag))
+	{
+		setTransTurn();
+		current_sp_used.lat = (double)PX4LnavTransTurn.transTurn.startPoint.latiMin / POINT_TRANS;
+		current_sp_used.lon = (double)PX4LnavTransTurn.transTurn.startPoint.longiMin / POINT_TRANS;
+	}
+	/*
+	PX4_INFO("%f %f %f %f %f %d ",
+	current_sp.lat,
+	current_sp.lon,
+	_current_latitude,
+	_current_longitude,
+	dist,
+	Lnav_inArc_flag);
+	PX4_INFO("\n");
+	*/
+
+        PX4LnavMainInput.Position.Latitude = _current_latitude;
+	PX4LnavMainInput.Position.Longitude = _current_longitude;
+	PX4LnavMainInput.TrackAngle.Magnetic = _yaw * M_RAD_TO_DEG_F;  //gps calc heading
+        PX4LnavMainInput.TrueAirSpeed = _airspeed / 0.514444F;
+	if(Lnav_inArc_flag)
+	{
+		PX4LnavMainInput.position_setpoint[0] = PX4LnavTransTurn.transTurn.startPoint.latiMin;
+		PX4LnavMainInput.position_setpoint[1] = PX4LnavTransTurn.transTurn.startPoint.longiMin;
+		PX4LnavMainInput.position_setpoint[2] = 0.0f;
+		PX4LnavMainInput.position_setpoint[3] = LNAV_RADIUM; //1nm=1852m
+		PX4LnavMainInput.position_setpoint[4] = PX4LnavTransTurn.transTurn.center.latiMin;
+		PX4LnavMainInput.position_setpoint[5] = PX4LnavTransTurn.transTurn.center.longiMin;
+		PX4LnavMainInput.position_setpoint[6] = PX4LnavTransTurn.transTurn.endPoint.latiMin;
+		PX4LnavMainInput.position_setpoint[7] = PX4LnavTransTurn.transTurn.endPoint.longiMin;
+
+	}
+	else
+	{
+		PX4LnavMainInput.position_setpoint[0] = _pos_sp_triplet.previous.lat * POINT_TRANS;
+		PX4LnavMainInput.position_setpoint[1] = _pos_sp_triplet.previous.lon * POINT_TRANS;
+		PX4LnavMainInput.position_setpoint[2] = 1.0f;
+		PX4LnavMainInput.position_setpoint[3] = 0.0f;
+		PX4LnavMainInput.position_setpoint[4] = 0.0f;
+		PX4LnavMainInput.position_setpoint[5] = 0.0f;
+		PX4LnavMainInput.position_setpoint[6] = _pos_sp_triplet.current.lat * POINT_TRANS;
+		PX4LnavMainInput.position_setpoint[7] = _pos_sp_triplet.current.lon * POINT_TRANS;
+		current_sp_latch = _pos_sp_triplet.current;
+	}
+	PX4LnavMainInput.lnav_status.lNavArmed = 0;
+	PX4LnavMainInput.lnav_status.lNavActive = 1;
+}
+
+//20230928 shiwei add: to test lnav
+void FixedwingPositionControl::publishVehicleLnav(float roll_body)
+{
+	vehicle_lnav_s vehicle_lnav{};
+	vehicle_lnav.timestamp = hrt_absolute_time();
+	vehicle_lnav.current_lat = PX4LnavMainInput.Position.Latitude;
+	vehicle_lnav.current_lon = PX4LnavMainInput.Position.Longitude;
+	vehicle_lnav.track_angle = PX4LnavMainInput.TrackAngle.Magnetic;
+	vehicle_lnav.true_air_speed = PX4LnavMainInput.TrueAirSpeed;
+	vehicle_lnav.pre_pos_sp_lat = (float)PX4LnavMainInput.position_setpoint[0];
+	vehicle_lnav.pre_pos_sp_lon = (float)PX4LnavMainInput.position_setpoint[1];
+	vehicle_lnav.cur_sp_type = (float)PX4LnavMainInput.position_setpoint[2];
+	vehicle_lnav.abs_cur_radium = (float)PX4LnavMainInput.position_setpoint[3];
+	vehicle_lnav.cur_center_lat = (float)PX4LnavMainInput.position_setpoint[4];
+	vehicle_lnav.cur_center_lon = (float)PX4LnavMainInput.position_setpoint[5];
+	vehicle_lnav.cur_pos_sp_lat = (float)PX4LnavMainInput.position_setpoint[6];
+	vehicle_lnav.cur_pos_sp_lon = (float)PX4LnavMainInput.position_setpoint[7];
+	vehicle_lnav.roll_body = roll_body;
+	_vehicle_lnav_pub.publish(vehicle_lnav);
+}
+//20230928 shiwei add: to test lnav
+
 void
 FixedwingPositionControl::control_auto_position(const hrt_abstime &now, const float dt, const Vector2d &curr_pos,
 		const Vector2f &ground_speed, const position_setpoint_s &pos_sp_prev, const position_setpoint_s &pos_sp_curr)
@@ -1204,6 +1316,30 @@ FixedwingPositionControl::control_auto_position(const hrt_abstime &now, const fl
 	} else {
 		_l1_control.navigate_waypoints(prev_wp_local, curr_wp_local, curr_pos_local, get_nav_speed_2d(ground_speed));
 		_att_sp.roll_body = _l1_control.get_roll_setpoint();
+
+		//20230922 shiwei add :to test lnav
+        	float LnavRollBody = 0.0;
+        	setLnavInput();
+        	lnavMain(PX4LnavMainInput,&LnavRollBody);
+		publishVehicleLnav(LnavRollBody);
+
+		if(_control_mode._padding0[0] == 1u){
+			_att_sp.roll_body = LnavRollBody / M_RAD_TO_DEG_F;
+			PX4_INFO("\n");
+			PX4_INFO("LNAV:%6.2f %6.2f %6.2f %6.2f %6.2f %6.2f %6.2f %6.2f %6.2f %6.2f %6.2f",
+				(double)PX4LnavMainInput.Position.Latitude,
+				(double)PX4LnavMainInput.Position.Longitude,
+				(double)PX4LnavMainInput.position_setpoint[0],
+				(double)PX4LnavMainInput.position_setpoint[1],
+				(double)PX4LnavMainInput.position_setpoint[2],
+				(double)PX4LnavMainInput.position_setpoint[3],
+				(double)PX4LnavMainInput.position_setpoint[4],
+				(double)PX4LnavMainInput.position_setpoint[5],
+				(double)PX4LnavMainInput.position_setpoint[6],
+				(double)PX4LnavMainInput.position_setpoint[7],
+				(double)LnavRollBody);
+		}
+		//20230922 shiwei add :to test lnav
 	}
 
 	_att_sp.yaw_body = _yaw; // yaw is not controlled, so set setpoint to current yaw

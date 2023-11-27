@@ -93,8 +93,13 @@
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/wind.h>
 #include <uORB/topics/orbit_status.h>
+#include <uORB/topics/vehicle_lnav.h>
 #include <uORB/uORB.h>
 #include <vtol_att_control/vtol_type.h>
+#include "lNavMain.h"
+
+#define POINT_TRANS (60.0)
+#define LNAV_RADIUM (0.2f)
 
 using namespace launchdetection;
 using namespace runwaytakeoff;
@@ -171,6 +176,7 @@ private:
 	uORB::Publication<position_controller_landing_status_s>	_pos_ctrl_landing_status_pub{ORB_ID(position_controller_landing_status)};	///< landing status publication
 	uORB::Publication<tecs_status_s>			_tecs_status_pub{ORB_ID(tecs_status)};						///< TECS status publication
 	uORB::PublicationMulti<orbit_status_s>			_orbit_status_pub{ORB_ID(orbit_status)};
+        uORB::Publication<vehicle_lnav_s> _vehicle_lnav_pub{ORB_ID(vehicle_lnav)};   //20230928 shiwei add :to test lnav
 
 	manual_control_setpoint_s	_manual_control_setpoint {};			///< r/c channel data
 	position_setpoint_triplet_s	_pos_sp_triplet {};		///< triplet of mission items
@@ -300,6 +306,14 @@ private:
 		STICK_CONFIG_SWAP_STICKS_BIT = (1 << 0),
 		STICK_CONFIG_ENABLE_AIRSPEED_SP_MANUAL_BIT = (1 << 1)
 	};
+
+        //20230928 shiwei add LNAV input : to test lnav
+	LnavMainInput_t PX4LnavMainInput;
+	//zhangmin add 2023 10 8
+	LnavTransTurn PX4LnavTransTurn;
+	position_setpoint_s current_sp_latch;
+	bool Lnav_inArc_flag;
+	position_setpoint_s current_sp_used;
 
 	// Update our local parameter cache.
 	int		parameters_update();
@@ -436,6 +450,19 @@ private:
 					float throttle_min, float throttle_max, float throttle_cruise,
 					bool climbout_mode, float climbout_pitch_min_rad,
 					bool disable_underspeed_detection = false, float hgt_rate_sp = NAN);
+
+	/*
+         * 20230828 shiwei add ,set Lnav Input :to test lnav
+	 *
+	 */
+        void setLnavInput(void);
+	void setTransTurn(void);
+
+	/*
+         * 20230828 shiwei add ,publish Lnav input and output :to test lnav
+	 *
+	 */
+	void publishVehicleLnav(float roll_body);
 
 	DEFINE_PARAMETERS(
 
